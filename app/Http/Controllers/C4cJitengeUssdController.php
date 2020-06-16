@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use App\Http\Requests\UssdRequest;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Cache;
@@ -64,11 +65,12 @@ class C4cJitengeUssdController extends Controller
 								
 								$session['sessionId'] = $sessionId;
 								
-								$session["phone_number"] = trimSpace($phoneNumberUtil->format($phoneNumberObject, PhoneNumberFormat::INTERNATIONAL));
+								//$session["phone_number"] = trimSpace($phoneNumberUtil->format($phoneNumberObject, PhoneNumberFormat::INTERNATIONAL));
 								
-								$response = $this->client->post(self::END_POINT . "https://c4c_api.mhealthkenya.org/api/login", [
+								$response = Http::post('https://c4c_api.mhealthkenya.org/api/login', [
 												'form_params' => [
-														'phone_no' => trim(ltrim($session["phone_number"], "+")),
+                                                        'msisdn' => trim(ltrim($session["phone_number"], "+")),
+                                                        'password' => trim(ltrim($session["phone_number"], "+"))
 												],
 												'cookies' => false
 										]
