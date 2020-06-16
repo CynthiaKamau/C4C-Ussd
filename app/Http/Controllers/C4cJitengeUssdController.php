@@ -6,132 +6,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Http\Requests\UssdRequest;
 use GuzzleHttp\Client;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberUtil;
 
 class C4cJitengeUssdController extends Controller
 {
-    const END_POINT = "https://c4c_api.mhealthkenya.org/api/exposures/covid/new";
+    const END_POINT = "http://c4c_api.mhealthkenya.org/api/exposures/covid/new";
 
     private $sessionOpeningTag = "CON C4C";
 
     private $sessionClosingTag = "END C4C";
 
-    protected $client;
-
-    public function handleRequest(UssdRequest $request)
-		{
-			$sessionId = request("sessionId");
-			$phoneNumber = request("phoneNumber");
-			$input = trim(request("text"));
-			$session = $this->getSession($sessionId);
-			
-			if ($input == "") {
-				
-				$response = $this->sessionOpeningTag . "\nEnter your phone number";
-				
-			} else {
-				
-				$parts = array_filter(explode('*', $input));
-				
-				$arraySize = count($parts);
-				
-				if (empty($session) && $arraySize > 1) {
-					
-					$response = "END You have entered an invalid phone number";
-					
-				} else {
-					
-					switch ($arraySize) {
-						
-						case 1:
-							
-							$isValidNumber = false;
-							$phoneNumberObject = null;
-							$phoneNumberUtil = PhoneNumberUtil::getInstance();
-							if ($phoneNumberUtil->isPossibleNumber($parts[0], "KE")) {
-								$phoneNumberObject = $phoneNumberUtil->parse($parts[0], "KE");
-								$isValidNumber = $phoneNumberUtil->isValidNumberForRegion($phoneNumberObject, "KE");
-							}
-							
-							if (!$isValidNumber || $phoneNumberObject == null) {
-								
-								$response = "$this->sessionClosingTag\nYou have entered an invalid phone number. Try again.";
-								
-								$this->deleteSession($session);
-								
-							} else {
-								
-								$session['sessionId'] = $sessionId;
-								
-								//$session["phone_number"] = trimSpace($phoneNumberUtil->format($phoneNumberObject, PhoneNumberFormat::INTERNATIONAL));
-								
-								$response = Http::post('https://c4c_api.mhealthkenya.org/api/login', [
-												'form_params' => [
-                                                        'msisdn' => trim(ltrim($session["phone_number"], "+")),
-                                                        'password' => trim(ltrim($session["phone_number"], "+"))
-												],
-												'cookies' => false
-										]
-								);
-								
-								$response = json_decode($response->getBody());
-								
-								
-								if (!empty($response) && $response->success === true) {
-									
-									//$response->is_hcw = 1;
-									
-									$session['is_hcw'] = (int)$response->is_hcw === 1 ? true : false;
-									
-									$session['token'] = $response->message;
-									
-									$session['client_id'] = $response->client_id;
-									
-									$this->setSession($session);
-									
-									if ($session['is_hcw']) {
-										
-										$response = $this->getListedPhoneNumbers($session);
-										
-									}
-									
-								} else {
-									
-									$response = "$this->sessionClosingTag\n" . $response->message;
-									
-								}
-								
-							}
-							
-							break;
-						
-						default:
-							
-							if ($session['is_hcw']) {
-								
-								unset($parts[1]);
-								
-								$parts = array_values($parts);
-								
-								$arraySize = count($parts);
-								
-							}
-							
-							$response = $this->performEvaluation($arraySize, $parts, $session);
-								
-							break;
-						
-					}
-					
-				}
-				
-				return $response;
-			}
-			
-			return response($response, 200)->header("Content-Type", "text/plain");
-		}
     private function getSession($sessionId)
     {
         return Cache::get($sessionId);
@@ -155,103 +42,172 @@ class C4cJitengeUssdController extends Controller
         return Cache::pull($session["sessionId"]);    
     }
 
-    private function showPhoneNumberSearchInput($session)
-    {
-        return $this->sessionOpeningTag . "\nEnter phone number of Health Care Worker";
-    }
+    protected $client;
 
-    private function getListedPhoneNumbers($session)
-    {
-        $response = $this->client->post(self::END_POINT . 'hcw', [
-            'form_params' => [
-                'phone_no' => trim(ltrim($session["phone_number"], "+")),
-            ],
-            'headers' => ['Authorization' => 'Bearer' . $session['token']],
-            'cookies' => false
-            ]
-        );
-        
-        return $this->listClients($response, $session);
+    public function __construct()
+		{
+			$this->client = new Client([
+                'verify' => false
+            ]);
+		}
 
-    }
+    public function handleRequest(UssdRequest $request)
+		{
+			$sessionId = request("sessionId");
+			$phoneNumber = request("phoneNumber");
+			$input = trim(request("text"));
+            $session = $this->getSession($sessionId);
+            
+			if ($input == "") {
+				
+				$response = $this->sessionOpeningTag . "\nEnter your phone number";
+				
+			} else {
+				
+				$parts = array_filter(explode('*', $input));
+				
+                $arraySize = count($parts);	
+                					
+					switch ($arraySize) {
+						
+                        case 1:   
+                                   							
+							$isValidNumber = false;
+							$phoneNumberObject = null;
+							$phoneNumberUtil = PhoneNumberUtil::getInstance();
+							if ($phoneNumberUtil->isPossibleNumber($parts[0], "KE")) {
+								$phoneNumberObject = $phoneNumberUtil->parse($parts[0], "KE");
+								$isValidNumber = $phoneNumberUtil->isValidNumberForRegion($phoneNumberObject, "KE");
+                            }                           
+							
+							if (!$isValidNumber || $phoneNumberObject == null) {
+								
+								$response = "$this->sessionClosingTag\nYou have entered an invalid phone number. Try again.";
+								
+								$this->deleteSession($session);
+								
+							}else{
 
-    private function performEvaluation($arraySize, array $parts, $session)
+                                $session['sessionId'] = $sessionId;
+								
+								$session["phone_number"] = preg_replace('/\s+/', '', trim($phoneNumberUtil->format($phoneNumberObject, PhoneNumberFormat::INTERNATIONAL)));
+                                
+                                $this->setSession($session);
+
+                                $response = "$this->sessionOpeningTag\nEnter your password";
+                            }                        
+														
+                            break;
+                            
+                        case 2: 
+
+                            $password = $parts[1];                                
+                                
+							$response = $this->client->post('http://c4c_api.mhealthkenya.org/api/auth/login', [
+									'form_params' => [
+                                        'msisdn' => trim(ltrim($session["phone_number"], "+")),
+                                        'password' => $password
+									],
+									'cookies' => false
+									]
+                            );                               
+								
+                            $response = json_decode($response->getBody());    
+															
+							if (!empty($response) && $response->success === true) {
+
+                                dd($response);
+																											
+								$session['token'] = $response->access_token;
+									
+								$session['client_id'] = $response->user->id;
+									
+                                $this->setSession($session);
+
+                                $response = $this->performEvaluation($session, $parts);
+
+                            } else {
+                                $response = "CON C4C\nDownload the C4C App and complete your profile";
+
+                                $this->deleteSession($session);
+                            } 
+                                
+                            break;
+
+						
+					}	
+				
+				
+				//return $response;
+			}
+			
+			return response($response, 200)->header("Content-Type", "text/plain");
+		}
+    
+
+    private function performEvaluation( $session, $parts)
     {
-        switch ($arraySize>1) {
+
+        switch (count($parts)) {
+
             case 2:
-                $choiceIndex = ((int)$parts[1]) - 1;
-
-                if (isset(session['clients']) && isset($session['clients'][$choiceIndex])) {
-
-                    $session["client_id"] = $session['clients'][$choiceIndex]->id;
-
-                    $this->setSession($session);
-
-                    $response = $this->sessionOpeningTag . "Have you had contact with a COVID 19 patient?\n1. Yes\n2. No";
                 
-                } else {
-
-                    $response = "$this->sessionClosingTag\nYou have entered an invalid  response. Try again.";
-
-                    $this->deleteSession($session);
-                }
+                $response = "CON C4C\nHave you had contact with a COVID 19 patient?\n1. Yes\n2. No";
 
             break;
 
             case 3:
-                if ($parts[2] == "1" || $parts[2] == "2") {
 
-                    $session["contact_person"] = $parts[2] == "1" ? "YES" : "NO";
+                $session["contact_person"] = $parts[2] == "1" ? "YES" : "NO";
 
-                    $this->setSession($session);
+               $this->setSession($session);
 
-                    if ($parts[2] == "1" || $parts[2] == "2" ) {
-
-                        $response = $this->sessionOpeningTag . '\nWhen did you get into contact with someone with COVID 19? (Date dd/mm/yyyy)';
-                    
-                    } else {
-
-                        $response = $this->sessionOpeningTag . "\nYou have entered an invalid response. Try again later.";
-
-                        $this->deleteSession($session);
-
-                    }
-                }     
+                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY"; 
 
                 break;
 
             case 4:
                 
-                $session["exposure_date"] = $parts[3];
-
-                if ($session['exposure_date'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d')) {
-
-                    $this->setSession($session);
-
-                    $response = $this->sessionOpeningTag . "\nDid you receive IPC training?\n1. Yes\n2. No";
-               
+                if (strlen($parts[4]) != 8) {
+								
+                    unset($session[4]);
+                    
+                    $response = "CON C4C\nWhen did you get into contact with someone with COVID 19 DDMMYYYY";
+                    
                 } else {
-
-                    $response = "$this->sessionClosingTag\nYou have entered an nvalid date. Try again";
-
-                    $this->deleteSession($session);
-                } 
+                    
+                    try {
+                        
+                        $session['contact_date'] = Carbon::createFromFormat('dmY', $parts[4])->format('Y-m-d');
+                        
+                        $this->setSession($session);
+                        
+                        $response = "CON C4C\nDid you receive IPC training?\n1. Yes\n2. No";
+                        
+                    } catch (Exception $exception) {
+                        
+                        unset($session[4]);
+                        
+                        $response = "CON C4C\nWhen did you get into contact with someone with COVID 19?";
+                        
+                    }
+                }
 
             break;
 
             case 5:
 
-                if ($parts[4] == "1" || $parts[4] == "2") {
+                if ($parts[5] == "1" || $parts[5] == "2") {
 
                     $session["ipc_training"] = $parts[4] == "1" ? "YES" : "NO";
 
                     $this->setSession($session);
 
-                    $response = $this->sessionOpeningTag . "\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
+                    $response = "CON C4C\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
              
                 } else {
 
-                    $response = "$this->sessionClosingTag\nYou have entered an invalid response. Try again.";
+                    $response = "CON C4C\nYou have entered an invalid response. Try again.";
 
                     $this->deleteSession($session);
 
@@ -261,19 +217,19 @@ class C4cJitengeUssdController extends Controller
 
             case 6:
 
-                if ($parts[5] == "1" || $parts[5] == "2") {
+                if ($parts[6] == "1" || $parts[6] == "2") {
 
-                    $session["ppe_worn"] = $parts[5] == "1" ? "YES" : "NO";
+                    $session["ppe_worn"] = $parts[6] == "1" ? "YES" : "NO";
 
                     $this->setSession($session);
 
-                    if ($parts[5] == "1")
+                    if ($parts[6] == "1")
 
-                        $response = $this->sessionOpeningTag . "\nDuring interaction with a COVID-19 patient, did you wear personal protective equipment (PPE)?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
+                        $response = "CON C4C\nDuring interaction with a COVID-19 patient, did you wear personal protective equipment (PPE)?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
              
                     } else {
 
-                        $response = "$this->sessionClosingTag\nYou have entered an invalid response. Try again.";
+                        $response = "CON C4C\nYou have entered an invalid response. Try again.";
 
                          $this->deleteSession($session);
 
@@ -283,26 +239,27 @@ class C4cJitengeUssdController extends Controller
 
             case 7:
 
-                if ($parts[6] == "1" || $parts[6] == "2") {
+                if ($parts[7] == "1" || $parts[7] == "2") {
 
-                    $session["ppe_worn"] = $parts[6] == "1" ? "YES" : "NO";
+                    $session["ppe_worn"] = $parts[7] == "1" ? "YES" : "NO";
 
                     $this->setSession($session);
 
-                    $response = $this->sessionOpeningTag . "\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
+                    $response = "CON C4C\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
 
             
                 } else {
 
-                $response = "$this->sessionClosingTag\nYou have entered an invalid response. Try again";
+                $response = "CON C4C\nYou have entered an invalid response. Try again";
 
                 $this->deleteSession($session);
             }
 
             break;
 
+        }
 
-    }
+        return $response;
   }
 }
 
