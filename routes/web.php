@@ -16,3 +16,5 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {return view('welcome');});
 
 Route::post('/ussd', 'C4cJitengeUssdController@handleRequest');
+
+Route::post('/c4c-ussd', 'UssdController@proceedWithEvaluation');

@@ -19,75 +19,117 @@ class C4cJitengeUssdController extends Controller
 
     protected $client;
 
-    public function handleRequest(UssdRequest $request) 
-    {
-        $sessionId = request("sessionId");
-        $phoneNumber = request("phoneNumber");
-        $input = trim(request("text"));
-        $session = $this->getSession($sessionId);
-
-        if ($input == "") {
-
-            $response = $this->sessionOpeningTag . "\nEnter your phone number";
-       
-        } else {
-
-            $parts = array_filter(explode('*', $input));
-
-            $arraySize = count($parts);
-
-            if (empty($session) && $arraySize > 1) {
-
-                $response = "END Unregistered, Download the C4C App and create a new account";
-
-            }
-            else {
-
-                $response = "END Please login to C4C App and complete your profile";
-
-            }
-        }
-
-        switch ($arraySize) {
-            case 1: 
-                $isValidNumber = false;
-                $phoneNumberObject = null;
-                // $phoneNumberUtil = PhoneNumberUtil::getInstance();
-                //     if ($phoneNumberUtil->isPossibleNumber($parts[0], "KE")) {
-                //     $phoneNumberObject = $phoneNumberUtil->parse($parts[0], "KE");
-                //     $isValidNumber = $phoneNumberUtil->isValidNumberFOrRegion($phoneNumberObject, "KE");
-                // }
-
-                if (!$isValidNumber || $phoneNumberObject == null) {
-
-                    $response = "$this->sessionClosingTag\nYou have entered an invalid phone number, please try again.";
-
-                    $this->deleteSession($session);
-                
-                } else {
-
-                    $session['sessionId'] = $sessionId;
-
-                    $session["phone_number"] = trimSpace($phoneNumberUtil->format($phoneNumberObject, PhoneNumber::INTERNATIONAL));
-
-                    $response = $this->client->post(self::END_POINT . 'login', [
-                        'form_params' => [
-                            'phone_no' => trim(ltrim($session["phone_number"], "+"))
-                        ],
-                        'cookies' => false
-                    ]
-                    );
-
-                    $response = json_decode($response->getBody());
-                } 
-
-        }
-    }
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+    public function handleRequest(UssdRequest $request)
+		{
+			$sessionId = request("sessionId");
+			$phoneNumber = request("phoneNumber");
+			$input = trim(request("text"));
+			$session = $this->getSession($sessionId);
+			
+			if ($input == "") {
+				
+				$response = $this->sessionOpeningTag . "\nEnter your phone number";
+				
+			} else {
+				
+				$parts = array_filter(explode('*', $input));
+				
+				$arraySize = count($parts);
+				
+				if (empty($session) && $arraySize > 1) {
+					
+					$response = "END You have entered an invalid phone number";
+					
+				} else {
+					
+					switch ($arraySize) {
+						
+						case 1:
+							
+							$isValidNumber = false;
+							$phoneNumberObject = null;
+							$phoneNumberUtil = PhoneNumberUtil::getInstance();
+							if ($phoneNumberUtil->isPossibleNumber($parts[0], "KE")) {
+								$phoneNumberObject = $phoneNumberUtil->parse($parts[0], "KE");
+								$isValidNumber = $phoneNumberUtil->isValidNumberForRegion($phoneNumberObject, "KE");
+							}
+							
+							if (!$isValidNumber || $phoneNumberObject == null) {
+								
+								$response = "$this->sessionClosingTag\nYou have entered an invalid phone number. Try again.";
+								
+								$this->deleteSession($session);
+								
+							} else {
+								
+								$session['sessionId'] = $sessionId;
+								
+								$session["phone_number"] = trimSpace($phoneNumberUtil->format($phoneNumberObject, PhoneNumberFormat::INTERNATIONAL));
+								
+								$response = $this->client->post(self::END_POINT . "https://c4c_api.mhealthkenya.org/api/login", [
+												'form_params' => [
+														'phone_no' => trim(ltrim($session["phone_number"], "+")),
+												],
+												'cookies' => false
+										]
+								);
+								
+								$response = json_decode($response->getBody());
+								
+								
+								if (!empty($response) && $response->success === true) {
+									
+									//$response->is_hcw = 1;
+									
+									$session['is_hcw'] = (int)$response->is_hcw === 1 ? true : false;
+									
+									$session['token'] = $response->message;
+									
+									$session['client_id'] = $response->client_id;
+									
+									$this->setSession($session);
+									
+									if ($session['is_hcw']) {
+										
+										$response = $this->getListedPhoneNumbers($session);
+										
+									}
+									
+								} else {
+									
+									$response = "$this->sessionClosingTag\n" . $response->message;
+									
+								}
+								
+							}
+							
+							break;
+						
+						default:
+							
+							if ($session['is_hcw']) {
+								
+								unset($parts[1]);
+								
+								$parts = array_values($parts);
+								
+								$arraySize = count($parts);
+								
+							}
+							
+							$response = $this->performEvaluation($arraySize, $parts, $session);
+								
+							break;
+						
+					}
+					
+				}
+				
+				return $response;
+			}
+			
+			return response($response, 200)->header("Content-Type", "text/plain");
+		}
     private function getSession($sessionId)
     {
         return Cache::get($sessionId);
@@ -133,7 +175,7 @@ class C4cJitengeUssdController extends Controller
 
     private function performEvaluation($arraySize, array $parts, $session)
     {
-        switch ($arraySize) {
+        switch ($arraySize>1) {
             case 2:
                 $choiceIndex = ((int)$parts[1]) - 1;
 
