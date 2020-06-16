@@ -209,7 +209,7 @@ class C4cJitengeUssdController extends Controller
                     
                     try {
                         
-                        $session['contact_date'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d');
+                        $session['date_of_contact'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d');
                                                 
                         $response = "CON C4C\nDid you receive IPC training?\n1. Yes\n2. No";
                         
@@ -217,7 +217,7 @@ class C4cJitengeUssdController extends Controller
                         
                         unset($session[3]);
                         
-                        $response = "CON C4C\nWhen did you get into contact with someone with COVID 19?";
+                        $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY";
                         
                     }
                 }
@@ -229,6 +229,42 @@ class C4cJitengeUssdController extends Controller
                 if ($parts[4] == "1" || $parts[4] == "2") {
 
                     $session["ipc_training"] = $parts[4] == "1" ? "YES" : "NO";
+
+                    $response = "CON C4C\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
+
+            
+                } else {
+
+                $response = "CON C4C\nYou have entered an invalid response. Try again";
+
+                $this->deleteSession($session);
+            }
+
+            break;
+
+            case 6:
+
+                if ($parts[5] == "1" || $parts[5] == "2") {
+
+                    $session["symptoms"] = $parts[5] == "1" ? "YES" : "NO";
+
+                    $response = "CON C4C\nWhat are the results of your PCR Test?\n1. Positive\n2. Negative\n3. Not applicable";
+
+            
+                } else {
+
+                $response = "CON C4C\nYou have entered an invalid response. Try again";
+
+                $this->deleteSession($session);
+            }
+
+            break;
+
+            case 7:
+
+                if ($parts[6] == "1" || $parts[6] == "2") {
+
+                    $session["pcr_test"] = $parts[6] == "1" ? "YES" : "NO";
 
                     $response = "CON C4C\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
              
@@ -242,41 +278,36 @@ class C4cJitengeUssdController extends Controller
 
             break;
 
-            case 6:
+            case 8:
 
-                if ($parts[5] == "1") {
+                if ($parts[7] == "1" ||$parts[7] == "2" ) {
 
-                    $session["ppe_worn"] = $parts[5] == "1" ? "YES" : "NO";
+                    $session["ppe_worn"] = $parts[7] == "1" ? "YES" : "NO";
 
-                    if ($parts[5] == "1")
+                    if ($parts[6] == "1")
 
-                        $response = "CON C4C\nDuring interaction with a COVID-19 patient, did you wear personal protective equipment (PPE)?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
+                        $response = "CON C4C\nWhich of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
              
-                    } else {
+                    } else if($parts[6] == "2") {
 
-                        $response = "CON C4C\nYou have entered an invalid response. Try again.";
+                        $response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded";
 
                         $this->deleteSession($session);
 
+                        $client = new Client();
+					
+					        $response = $client->post(self::END_POINT . 'response', [
+									'form_params' => $session,
+									'headers' => ['Authorization' => 'Bearer ' . $session['token']],
+									'cookies' => false
+							]
+					);
+					
+					$response = json_decode($response->getBody());
+					
+					$response = "$this->sessionClosingTag\n" . $response->message;
+
                     }
-
-            break;
-
-            case 7:
-
-                if ($parts[6] == "1" || $parts[6] == "2") {
-
-                    $session["ppe_worn"] = $parts[6] == "1" ? "YES" : "NO";
-
-                    $response = "CON C4C\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
-
-            
-                } else {
-
-                $response = "CON C4C\nYou have entered an invalid response. Try again";
-
-                $this->deleteSession($session);
-            }
 
             break;
 
