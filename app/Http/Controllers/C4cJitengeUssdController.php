@@ -10,11 +10,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberUtil;
-
+global $apiResponse;
 class C4cJitengeUssdController extends Controller
 {
     const END_POINT = "http://c4c_api.localhost/api/exposures/covid/new";
-
+    
     private $sessionOpeningTag = "CON C4C";
 
     private $sessionClosingTag = "END C4C";
@@ -57,7 +57,7 @@ class C4cJitengeUssdController extends Controller
 			$phoneNumber = request("phoneNumber");
 			$input = trim(request("text"));
             $session = $this->getSession($sessionId);
-            
+        
 			if ($input == "") {
 				
 				$response = $this->sessionOpeningTag . "\nEnter your phone number";
@@ -65,7 +65,7 @@ class C4cJitengeUssdController extends Controller
 			} else {
 				
 				$parts = array_filter(explode('*', $input));
-				
+				$apiResponse;
                 $arraySize = count($parts);	
                 					
 					switch ($arraySize) {
@@ -102,8 +102,7 @@ class C4cJitengeUssdController extends Controller
                         case 2: 
 
                             $password = $parts[1];                                
-                                
-							$response = $this->client->post('http://c4c_api.localhost/api/auth/login', [
+							$apiResponse = $this->client->post('http://c4c_api.mhealthkenya.org/api/auth/login', [
 									'form_params' => [
                                         'msisdn' => trim(ltrim($session["phone_number"], "+")),
                                         'password' => $password
@@ -113,224 +112,330 @@ class C4cJitengeUssdController extends Controller
                                     
                             );                               
 								
-                            $response = json_decode($response->getBody());
-                            															
-							if (!empty($response) && ($response->user->profile_complete === 1) && $response->success === true) {
-																											
-								$session['token'] = $response->access_token;
-									
-                                $session['client_id'] = $response->user->id;
+                            $apiResponse = json_decode($apiResponse->getBody());
+                           
+                            if (!empty($apiResponse->access_token) && $apiResponse->success === true) {
+                                                                                                        
+                                $session['token'] = $apiResponse->access_token;
+                                    
+                                $session['client_id'] = $apiResponse->user->id;
 
-                                //dd($response->user);
-                                
-                                //$session['is_hcw'] = $response->user->role_id;
-									
+                                    
                                 $this->setSession($session);
 
-                                $response = $this->performEvaluation($session, $parts);
+                                
+                                switch (count($parts)) {
 
-                            } else if($response->success === false) {
+                                
+
+                                    case 2:
+                                                    
+                                        $response = "CON C4C\nHave you had contact with a COVID 19 patient?\n1. Yes\n2. No";
+                                    
+                                        break;
+                                
+                                    case 3:
+                                    
+                                        $session["contact_person"] = $parts[2] == "1" ? "YES" : "NO";
+                                    
+                                        // $contact_person = $this->$session;
+                                    
+                                    
+                                        $this->setSession($session);
+                                    
+                                        $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY"; 
+                                    
+                                        break;
+                                    
+                                    case 4:
+                                                    
+                                        if (strlen($parts[3]) != 8) {
+                                                                    
+                                            unset($session[3]);
+                                                            
+                                            $response = "CON C4C\nWhen did you get into contact with someone with COVID 19 DDMMYYYY";
+                                                        
+                                        } else {
+                                                        
+                                            try {
+                                                            
+                                                $session['date_of_contact'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d');
+                                                                                    
+                                                $response = "CON C4C\nDid you receive IPC training?\n1. Yes\n2. No";
+                                                            
+                                            } catch (Exception $exception) {
+                                                            
+                                                unset($session[3]);
+                                                            
+                                                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY";
+                                                            
+                                            }
+                                        }
+                                    
+                                        break;
+                                    
+                                    case 5:
+                                    
+                                        if ($parts[4] == "1" || $parts[4] == "2") {
+                                    
+                                            $session["ipc_training"] = $parts[4] == "1" ? "YES" : "NO";
+                                    
+                                            $response = "CON C4C\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
+                                    
+                                                
+                                        } else {
+                                    
+                                            $response = "CON C4C\nYou have entered an invalid response. Try again";
+                                    
+                                            $this->deleteSession($session);
+                                        }
+                                    
+                                        break;
+                                    
+                                    case 6:
+                                    
+                                        if ($parts[5] == "1" || $parts[5] == "2" || $parts[5] == "3" || $parts[5] == "4" || $parts[5] == "5" || $parts[5] == "6" || $parts[5] == "7") {
+                                    
+                                            $session["symptoms"] = $parts[5];
+                                    
+                                            $response = "CON C4C\nWhat are the results of your PCR Test?\n1. Positive\n2. Negative\n3. Not applicable";
+                                    
+                                        } else {
+                                    
+                                            $response = "CON C4C\nYou have entered an invalid response. Try again";
+                                    
+                                            $this->deleteSession($session);
+                                        }
+                                    
+                                        break;
+                                    
+                                    case 7:
+                                    
+                                        if ($parts[6] == "1" || $parts[6] == "2" || $parts[6] == "3") {
+                                    
+                                            $session["pcr_test"] = $parts[6];
+                                    
+                                            $response = "CON C4C\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
+                                                    
+                                        } else {
+                                    
+                                            $response = "CON C4C\nYou have entered an invalid response. Try again.";
+                                    
+                                            $this->deleteSession($session);
+                                    
+                                        }
+                                    
+                                        break;
+                                    
+                                    case 8:
+                                    
+                                        if ($parts[7] == "1" ||$parts[7] == "2" ) {
+                                    
+                                            $session["ppe_worn"] = $parts[7] == "1" ? "YES" : "NO";
+                                    
+                                                if ($parts[7] == "1"){
+                                    
+                                                        $response = "CON C4C\nWhich of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
+                                                    
+                                                } else if($parts[7] == "2") {
+                                    
+                                                    //$response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded";
+                                    
+                                                    dd($session);       
+                                                        
+                                                    //$response = json_decode($response->getBody());
+                                                            
+                                                    $response = "$this->sessionClosingTag\n" . $response->message;
+                                                            
+                                                    $this->deleteSession($session);
+                                    
+                                    
+                                                }
+                                        }
+                                    
+                                        break;
+                                    
+                                    default:
+                                    
+                                        $response = "END Thank you for reporting an exposure. Your responses have been recorded";
+                                    
+                                        break;                            
+
+                                }
+
+                            } else if($apiResponse->success === false) {
 
                                 $response = "CON C4C\nInvalid credentials, check your phone number or password ";
 
                                 $this->deleteSession($session);
 
-                            } else if($response->success === true && $response->user->profile_complete === 0 ){
+                            } else if($apiResponse->success === true && $apiResponse->user->profile_complete === 0 ){
 
                                 $response = "CON C4C\nDownload the C4C App and complete your profile";
 
                                 $this->deleteSession($session);
 
-                            } 
-            
+                            } else {
+                                $response = "an error occured";
+                                $this->deleteSession($session);
+                            }
+
+                        break;
+
+                        case 3:
+                                    
+                            $session["contact_person"] = $parts[2] == "1" ? "YES" : "NO";                        
+                        
+                            $this->setSession($session);
+                        
+                            $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY"; 
+                         
+
+                        break;
+
+                        case 4:
+
+                            if (strlen($parts[3]) != 8) {
+								
+                                unset($session[3]);
                                 
-                            break;
+                                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19 DDMMYYYY";
+                                
+                            } else {
+                                
+                                try {
+                                    
+                                    $session['date_of_contact'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d');
+                                                            
+                                    $response = "CON C4C\nDid you receive IPC training?\n1. Yes\n2. No";
+                                    
+                                } catch (Exception $exception) {
+                                    
+                                    unset($session[3]);
+                                    
+                                    $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY";
+                                    
+                                }
+                            }            
 
-                            case 3: 
-                                $response = $this->performEvaluation($session, $parts);
 
-                            break;
+                        break;
 
-                            case 4: 
-                                $response = $this->performEvaluation($session, $parts);
+                        case 5:
 
-                            break;
+                            if ($parts[4] == "1" || $parts[4] == "2") {
 
-                            case 5: 
-                                $response = $this->performEvaluation($session, $parts);
+                                $session["ipc_training"] = $parts[4] == "1" ? "YES" : "NO";
+            
+                                $response = "CON C4C\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
+            
+                        
+                            } else {
+            
+                            $response = "CON C4C\nYou have entered an invalid response. Try again";
+            
+                            $this->deleteSession($session);
+                        }            
 
-                            break;
 
-                            case 6: 
-                                $response = $this->performEvaluation($session, $parts);
+                        break;
+                        
 
-                            break;
+                        case 6:
 
-                            case 7: 
-                                $response = $this->performEvaluation($session, $parts);
+                            if ($parts[5] == "1" || $parts[5] == "2" || $parts[5] == "3" || $parts[5] == "4" || $parts[5] == "5" || $parts[5] == "6" || $parts[5] == "7") {
 
-                            break;
+                                $session["symptoms"] = $parts[5];
+            
+                                $response = "CON C4C\nWhat are the results of your PCR Test?\n1. Positive\n2. Negative\n3. Not applicable";
+            
+                            } else {
+            
+                            $response = "CON C4C\nYou have entered an invalid response. Try again";
+            
+                            $this->deleteSession($session);
+                        }            
 
-                            default: 
 
-                                $response = $this->performEvaluation($session, $parts);
+                        break;
+                        
 
-                            break;
+                        case 7:
+
+                            if ($parts[6] == "1" || $parts[6] == "2" || $parts[6] == "3") {
+
+                                $session["pcr_test"] = $parts[6];
+            
+                                $response = "CON C4C\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
+                         
+                            } else {
+            
+                                $response = "CON C4C\nYou have entered an invalid response. Try again.";
+            
+                                $this->deleteSession($session);
+            
+                            }            
+
+
+                        break;
+
+                        case 8:
+
+                            if ($parts[7] == "1" ||$parts[7] == "2" ) {
+
+                                $session["ppe_worn"] = $parts[7] == "1" ? "YES" : "NO";
+            
+                                if ($parts[7] == "1") {
+            
+                                    $response = "CON C4C\nWhich of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
+                         
+                                } else if($parts[7] == "2") {
+            
+                                    $response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded ";
+            
+                                }
+
+                                    dd($session);
+            
+                                    $client = new Client();
+                                
+                                        $response = $client->post('http://c4c_api.localhost/api/exposures/covid/new', [
+                                                'form_params' => $session,
+                                                'headers' => ['Authorization' => 'Bearer ' . $session['token']],
+                                                'cookies' => false
+                                        ]
+                                );
+                                
+                                $response = json_decode($response->getBody());
+                                
+                                $response = "$this->sessionClosingTag\n" . $response->message;
+            
+                            }
+            
+
+
+                        break;
+                        
+    
+                        default:
+
+                        $response = "Ndani";
+
+                        // $response = "END Thank you for reporting an exposure. Your responses have been recorded";
+
+                        break;
+                    }
+                
+                   	                   
 				
-
-                        }
-                           
-				
-				//return $response;
-			        }
+			
+			}
 			
 			return response($response, 200)->header("Content-Type", "text/plain");
-		}
-    
-
-    private function performEvaluation( $session, $parts)
-    {
-
-        switch (count($parts)) {
-
-            case 2:
-                
-                $response = "CON C4C\nHave you had contact with a COVID 19 patient?\n1. Yes\n2. No";
-
-            break;
-
-            case 3:
-
-                $session["contact_person"] = $parts[2] == "1" ? "YES" : "NO";
-
-               //$this->setSession($session);
-
-                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY"; 
-
-                break;
-
-            case 4:
-                
-                if (strlen($parts[3]) != 8) {
-								
-                    unset($session[3]);
-                    
-                    $response = "CON C4C\nWhen did you get into contact with someone with COVID 19 DDMMYYYY";
-                    
-                } else {
-                    
-                    try {
-                        
-                        $session['date_of_contact'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d');
-                                                
-                        $response = "CON C4C\nDid you receive IPC training?\n1. Yes\n2. No";
-                        
-                    } catch (Exception $exception) {
-                        
-                        unset($session[3]);
-                        
-                        $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY";
-                        
-                    }
-                }
-
-            break;
-
-            case 5:
-
-                if ($parts[4] == "1" || $parts[4] == "2") {
-
-                    $session["ipc_training"] = $parts[4] == "1" ? "YES" : "NO";
-
-                    $response = "CON C4C\nWhich of these symptoms are you experiencing any of these symptoms?\n1. Fever\n2. Cough\n3. Difficulty in breathing\n4. Fatigue\n5. Sneezing\n6. Sore throat\n7. None";
-
-            
-                } else {
-
-                $response = "CON C4C\nYou have entered an invalid response. Try again";
-
-                $this->deleteSession($session);
-            }
-
-            break;
-
-            case 6:
-
-                if ($parts[5] == "1" || $parts[5] == "2" || $parts[5] == "3" || $parts[5] == "4" || $parts[5] == "5" || $parts[5] == "6" || $parts[5] == "7") {
-
-                    $session["symptoms"] = $parts[5];
-
-                    $response = "CON C4C\nWhat are the results of your PCR Test?\n1. Positive\n2. Negative\n3. Not applicable";
-
-                } else {
-
-                $response = "CON C4C\nYou have entered an invalid response. Try again";
-
-                $this->deleteSession($session);
-            }
-
-            break;
-
-            case 7:
-
-                if ($parts[6] == "1" || $parts[6] == "2" || $parts[6] == "3") {
-
-                    $session["pcr_test"] = $parts[6];
-
-                    $response = "CON C4C\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
-             
-                } else {
-
-                    $response = "CON C4C\nYou have entered an invalid response. Try again.";
-
-                    $this->deleteSession($session);
-
-                }
-
-            break;
-
-            case 8:
-
-                if ($parts[7] == "1" ||$parts[7] == "2" ) {
-
-                    $session["ppe_worn"] = $parts[7] == "1" ? "YES" : "NO";
-
-                    if ($parts[7] == "1")
-
-                        $response = "CON C4C\nWhich of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
-             
-                    } else if($parts[7] == "2") {
-
-                        $response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded";
-
-                        $this->deleteSession($session);
-
-                        $client = new Client();
-					
-					        $response = $client->post('http://c4c_api.localhost/api/exposures/covid/new', [
-									'form_params' => $session,
-									'headers' => ['Authorization' => 'Bearer ' . $session['token']],
-									'cookies' => false
-							]
-					);
-					
-					$response = json_decode($response->getBody());
-					
-					$response = "$this->sessionClosingTag\n" . $response->message;
-
-                    }
-
-            break;
-
-            default:
-
-            $response = "END Thank you for reporting an exposure. Your responses have been recorded";
-
-            break;
-
         }
-
-        return $response;
-  }
-}
+        
+}  
+    
+    
+    
 
