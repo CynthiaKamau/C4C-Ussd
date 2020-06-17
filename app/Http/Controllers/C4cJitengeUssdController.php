@@ -205,7 +205,7 @@ class C4cJitengeUssdController extends Controller
 
                //$this->setSession($session);
 
-                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DD/MM/YYYY"; 
+                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY"; 
 
                 break;
 
@@ -258,7 +258,7 @@ class C4cJitengeUssdController extends Controller
 
                 if ($parts[5] == "1" || $parts[5] == "2" || $parts[5] == "3" || $parts[5] == "4" || $parts[5] == "5" || $parts[5] == "6" || $parts[5] == "7") {
 
-                    $session["symptoms"] = $parts[5] == "1" ? "YES" : "NO";
+                    $session["symptoms"] = $parts[5];
 
                     $response = "CON C4C\nWhat are the results of your PCR Test?\n1. Positive\n2. Negative\n3. Not applicable";
 
@@ -275,7 +275,7 @@ class C4cJitengeUssdController extends Controller
 
                 if ($parts[6] == "1" || $parts[6] == "2" || $parts[6] == "3") {
 
-                    $session["pcr_test"] = $parts[6] == "1" ? "YES" : "NO";
+                    $session["pcr_test"] = $parts[6];
 
                     $response = "CON C4C\nDuring interaction with a COVID-19 patient, were you wear personal protective equipment (PPE)?\n1. Yes \n2. No";
              
