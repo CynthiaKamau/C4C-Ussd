@@ -211,7 +211,7 @@ class C4cJitengeUssdController extends Controller
 
             case 4:
                 
-                if (strlen($parts[3]) != 10) {
+                if (strlen($parts[3]) != 8) {
 								
                     unset($session[3]);
                     
