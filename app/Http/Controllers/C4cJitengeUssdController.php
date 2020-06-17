@@ -136,7 +136,7 @@ class C4cJitengeUssdController extends Controller
                                 $this->deleteSession($session);
 
                             } else if($response->success === true && $response->user->profile_complete === 0 ){
-                                
+
                                 $response = "CON C4C\nDownload the C4C App and complete your profile";
 
                                 $this->deleteSession($session);
@@ -256,13 +256,12 @@ class C4cJitengeUssdController extends Controller
 
             case 6:
 
-                if ($parts[5] == "1" || $parts[5] == "2") {
+                if ($parts[5] == "1" || $parts[5] == "2" || $parts[5] == "3" || $parts[5] == "4" || $parts[5] == "5" || $parts[5] == "6" || $parts[5] == "7") {
 
                     $session["symptoms"] = $parts[5] == "1" ? "YES" : "NO";
 
                     $response = "CON C4C\nWhat are the results of your PCR Test?\n1. Positive\n2. Negative\n3. Not applicable";
 
-            
                 } else {
 
                 $response = "CON C4C\nYou have entered an invalid response. Try again";
@@ -274,7 +273,7 @@ class C4cJitengeUssdController extends Controller
 
             case 7:
 
-                if ($parts[6] == "1" || $parts[6] == "2") {
+                if ($parts[6] == "1" || $parts[6] == "2" || $parts[6] == "3") {
 
                     $session["pcr_test"] = $parts[6] == "1" ? "YES" : "NO";
 
