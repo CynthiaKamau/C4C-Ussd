@@ -13,7 +13,7 @@ use libphonenumber\PhoneNumberUtil;
 
 class C4cJitengeUssdController extends Controller
 {
-    const END_POINT = "http://c4c_api.mhealthkenya.org/api/exposures/covid/new";
+    const END_POINT = "http://c4c_api.localhost/api/exposures/covid/new";
 
     private $sessionOpeningTag = "CON C4C";
 
@@ -103,7 +103,7 @@ class C4cJitengeUssdController extends Controller
 
                             $password = $parts[1];                                
                                 
-							$response = $this->client->post('http://c4c_api.mhealthkenya.org/api/auth/login', [
+							$response = $this->client->post('http://c4c_api.localhost/api/auth/login', [
 									'form_params' => [
                                         'msisdn' => trim(ltrim($session["phone_number"], "+")),
                                         'password' => $password
@@ -288,11 +288,11 @@ class C4cJitengeUssdController extends Controller
 
                     $session["ppe_worn"] = $parts[7] == "1" ? "YES" : "NO";
 
-                    if ($parts[6] == "1")
+                    if ($parts[7] == "1")
 
                         $response = "CON C4C\nWhich of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n6. None";
              
-                    } else if($parts[6] == "2") {
+                    } else if($parts[7] == "2") {
 
                         $response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded";
 
