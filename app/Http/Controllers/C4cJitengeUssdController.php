@@ -129,12 +129,20 @@ class C4cJitengeUssdController extends Controller
 
                                 $response = $this->performEvaluation($session, $parts);
 
-                            } else {
+                            } else if($response->success === false) {
+
+                                $response = "CON C4C\nInvalid credentials, check your phone number or password ";
+
+                                $this->deleteSession($session);
+
+                            } else if($response->success === true && $response->user->profile_complete === 0 ){
+                                
                                 $response = "CON C4C\nDownload the C4C App and complete your profile";
 
                                 $this->deleteSession($session);
 
                             } 
+            
                                 
                             break;
 
