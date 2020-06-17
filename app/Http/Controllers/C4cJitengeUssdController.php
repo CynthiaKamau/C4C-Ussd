@@ -205,13 +205,13 @@ class C4cJitengeUssdController extends Controller
 
                //$this->setSession($session);
 
-                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DDMMYYYY"; 
+                $response = "CON C4C\nWhen did you get into contact with someone with COVID 19? DD/MM/YYYY"; 
 
                 break;
 
             case 4:
                 
-                if (strlen($parts[3]) != 8) {
+                if (strlen($parts[3]) != 10) {
 								
                     unset($session[3]);
                     
@@ -307,7 +307,7 @@ class C4cJitengeUssdController extends Controller
 
                         $client = new Client();
 					
-					        $response = $client->post(self::END_POINT . 'response', [
+					        $response = $client->post('http://c4c_api.localhost/api/exposures/covid/new', [
 									'form_params' => $session,
 									'headers' => ['Authorization' => 'Bearer ' . $session['token']],
 									'cookies' => false
