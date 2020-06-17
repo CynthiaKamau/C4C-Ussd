@@ -115,11 +115,15 @@ class C4cJitengeUssdController extends Controller
 								
                             $response = json_decode($response->getBody());
                             															
-							if (!empty($response) && $response->success === true) {
+							if (!empty($response) && ($response->user->profile_complete === 1) && $response->success === true) {
 																											
 								$session['token'] = $response->access_token;
 									
-								$session['client_id'] = $response->user->id;
+                                $session['client_id'] = $response->user->id;
+
+                                //dd($response->user);
+                                
+                                //$session['is_hcw'] = $response->user->role_id;
 									
                                 $this->setSession($session);
 
