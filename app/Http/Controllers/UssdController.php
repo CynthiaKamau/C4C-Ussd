@@ -10,7 +10,7 @@
 	use libphonenumber\PhoneNumberFormat;
 	use libphonenumber\PhoneNumberUtil;
 	
-	class JitengeRegistrationAndEvaluationUssdController extends Controller
+	class UssdController extends Controller
 	{
 		const END_POINT = "https://c4c_api.mhealthkenya.org/api/exposures/covid/new/";
 		
