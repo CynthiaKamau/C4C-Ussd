@@ -105,7 +105,7 @@ class C4cJitengeUssdController extends Controller
 
                     case 2:
 
-                        $apiResponse = $this->client->post('http://c4c_api.mhealthkenya.org/api/auth/login', [
+                        $apiResponse = $this->client->post('http://c4c_api.localhost/api/auth/login', [
                                 'form_params' => [
                                     'msisdn' => trim(ltrim($session["phone_number"], "+")),
                                     'password' => $parts[1]
@@ -402,7 +402,7 @@ class C4cJitengeUssdController extends Controller
         $session['management'] = 'N/A';
         $session['place_of_diagnosis'] = 'N/A';
 
-        $response = $this->client->request('POST', 'http://c4c_api.mhealthkenya.org/api/exposures/covid/new/ussd', [
+        $response = $this->client->request('POST', 'http://c4c_api.localhost/api/exposures/covid/new/ussd', [
             'json' => $session,
             'headers' => ['Authorization' => 'Bearer ' . $session['token'],
                           'Accept' => 'application/json',
