@@ -110,10 +110,13 @@ class C4cJitengeUssdController extends Controller
                                     'msisdn' => trim(ltrim($session["phone_number"], "+")),
                                     'password' => $parts[1]
                                 ],
-                                'cookies' => false
+                                'cookies' => false,
+                                "http_errors" => false
                             ]
 
                         );
+
+                        
 
                         $apiResponse = json_decode($apiResponse->getBody());
 
@@ -127,7 +130,9 @@ class C4cJitengeUssdController extends Controller
 
                                 $this->setSession($session);
 
-                                $response = $this->sessionOpeningTag . "Enter your ID Number";
+                                dd($apiResponse);
+
+                                $response = $this->sessionOpeningTag . "Enter your ID Number"; 
 
                             } else {
 
@@ -139,7 +144,7 @@ class C4cJitengeUssdController extends Controller
 
                         } else {
 
-                            $response = $this->sessionClosingTag . "You have entered an invalid password";
+                            $response = $this->sessionClosingTag . "You have entered an invalid phone number or password";
 
                             $this->deleteSession($session);
 
@@ -291,9 +296,9 @@ class C4cJitengeUssdController extends Controller
 
                         }
 
-                        break;
+                            break;
 
-                        case 9:
+                    case 9:
 
                             try {
     
@@ -331,7 +336,7 @@ class C4cJitengeUssdController extends Controller
 
                                 if ($parts[9] == "1") {
 
-                                    $response = $this->sessionOpeningTag . "Which of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n7. None";
+                                    $response = $this->sessionOpeningTag . "Which of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron";
 
                                 } else {
 
@@ -359,8 +364,7 @@ class C4cJitengeUssdController extends Controller
                             'N95 mask (or equivalent)',
                             'Face shield or goggles/protective glasses',
                             'Disposable gown',
-                            'Waterproof apron',
-                            'None',
+                            'Waterproof apron'
                         ];
 
                         if (isset($ppeWorn[$index])) {
