@@ -12,7 +12,7 @@ use libphonenumber\PhoneNumberUtil;
 
 class C4cJitengeUssdController extends Controller
 {
-    private $sessionOpeningTag = "CON C4\n";
+    private $sessionOpeningTag = "CON C4C\n";
 
     private $sessionClosingTag = "END C4C\n";
 
@@ -264,6 +264,7 @@ class C4cJitengeUssdController extends Controller
                         }
 
                         break;
+
                     case 8:
 
                         $index = ((int)$parts[7] - 1);
@@ -280,7 +281,7 @@ class C4cJitengeUssdController extends Controller
 
                             $this->setSession($session);
 
-                            $response = $this->sessionOpeningTag . "Were you wearing Personal Protective Equipment(PPE)\n1 Yes\n2 No";
+                            $response = $this->sessionOpeningTag . "When did you begin isolation? DDMMYY";
 
                         } else {
 
@@ -291,9 +292,29 @@ class C4cJitengeUssdController extends Controller
                         }
 
                         break;
-                    case 9:
 
-                        $index = ((int)$parts[8] - 1);
+                        case 9:
+
+                            try {
+    
+                                $session['isolation_start_date'] = Carbon::createFromFormat('dmY', $parts[8])->format('Y-m-d');
+    
+                                $this->setSession($session);
+
+                                $response = $this->sessionOpeningTag . "Were you wearing Personal Protective Equipment(PPE)\n1 Yes\n2 No";    
+    
+                            } catch (Exception $exception) {
+    
+                                $response = $this->sessionClosingTag . "You have entered an invalid date";
+    
+                                $this->deleteSession($session);
+    
+                            }
+    
+                            break;    
+                    case 10:
+
+                        $index = ((int)$parts[9] - 1);
 
                         $ppeWorn = [
                             'Yes',
@@ -306,9 +327,9 @@ class C4cJitengeUssdController extends Controller
 
                             $this->setSession($session);
 
-                            if ($parts[8] == "1" || $parts[8] == "2") {
+                            if ($parts[9] == "1" || $parts[9] == "2") {
 
-                                if ($parts[8] == "1") {
+                                if ($parts[9] == "1") {
 
                                     $response = $this->sessionOpeningTag . "Which of these personal protective equipment (PPE) were you wearing?\n1. Single Gloves\n2. N95 mask (or equivalent)\n3. Face shield or goggles/protective glasses\n4. Disposable gown\n5. Waterproof apron\n7. None";
 
@@ -329,9 +350,9 @@ class C4cJitengeUssdController extends Controller
 
                         break;
 
-                    case 10:
+                    case 11:
 
-                        $index = ((int)$parts[9] - 1);
+                        $index = ((int)$parts[10] - 1);
 
                         $ppeWorn = [
                             'Single Gloves',
@@ -376,25 +397,26 @@ class C4cJitengeUssdController extends Controller
 
         unset($session['sessionId']);
 
-        //unset($session['token']);
+        unset($session['client_id']);
 
         $session['management'] = 'N/A';
         $session['place_of_diagnosis'] = 'N/A';
-        $session['county'] = 0;
-        $session['subcounty'] = 0;
-        $session['ward_id'] = 0;
 
-        $response = $this->client->post("http://c4c_api.mhealthkenya.org/api/exposures/covid/new/ussd", [
-                'form_params' => $session,
-                'headers' => ['Authorization' => 'Bearer ' . $session['token']],
-                'cookies' => false
+        $response = $this->client->request('POST', 'http://c4c_api.mhealthkenya.org/api/exposures/covid/new/ussd', [
+            'json' => $session,
+            'headers' => ['Authorization' => 'Bearer ' . $session['token'],
+                          'Accept' => 'application/json',
+                          'Content-Type' => 'application/json'    
+                         ],
+            'cookies' => false
             ]
         );
 
         $response = json_decode($response->getBody());
 
-       return [$response];
-        //$response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded ";
+       return [$response->message];
+        
+       //$response = "END Thank you for reporting a COVID 19 exposure. Your responses have been recorded ";
 
         return $session;
     }
