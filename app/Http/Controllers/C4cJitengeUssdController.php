@@ -105,7 +105,7 @@ class C4cJitengeUssdController extends Controller
 
                     case 2:
 
-                        $apiResponse = $this->client->post('http://c4c_api.mhealthkenya.org/api/auth/login', [
+                        $apiResponse = $this->client->post('http://c4c_api.localhost/api/auth/login', [
                                 'form_params' => [
                                     'msisdn' => trim(ltrim($session["phone_number"], "+")),
                                     'password' => $parts[1]
@@ -162,43 +162,40 @@ class C4cJitengeUssdController extends Controller
 
                     case 4:
 
-                        $todayDate = Carbon::now()->format('Y-m-d');
-
                         if (strlen($parts[3]) != 8) {
 								
                             unset($session[3]);
                             
-                            $response = "CON C4C\nEnter a valid date of contact. DDMMYYYY eg  01122020";
-                            
-                        } else {
+                            $response = $this->sessionOpeningTag . "Enter a valid date of contact. DDMMYYYY eg  01122020";
 
+                        } else {    
+                            
                             try {
 
                                 $session['date_of_contact'] = Carbon::createFromFormat('dmY', $parts[3])->format('Y-m-d', 'East Africa Time');
 
-                                $this->setSession($session);
+                                if(Carbon::parse($session['date_of_contact'])->gt(Carbon::now()->format('Y-m-d') ) ) {
 
-                                $userdate = date_create_from_format('Y-m-d', $session['date_of_contact']);
+                                    unset($session[3]);
+        
+                                    $response = $this->sessionClosingTag . "Future dates are invalid";
+        
+                                } else {
+
+                                $this->setSession($session);
 
                                 $response = $this->sessionOpeningTag . "What is the source of exposure?\n1 Patient\n2 Colleague\n3 Community\n4 Home\n5 Unknown";
 
-
+                                }
+                            
                             } catch (Exception $exception) {
-
-                                // if($userdate > $todayDate) {
-
-                                //     unset($session[3]);
-
-                                //     $response = "CON C4C\nFuture dates are invalid";
-
-                                // }
 
                                 $response = $this->sessionClosingTag . "You have entered an invalid date";
 
                                 $this->deleteSession($session);
 
                             }
-                        }    
+                        } 
 
                         break;
                     case 5:
@@ -318,22 +315,41 @@ class C4cJitengeUssdController extends Controller
                             break;
 
                     case 9:
+                        $session['isolation_start_date'] = Carbon::createFromFormat('dmY', $parts[8])->format('Y-m-d');
 
                         if (strlen($parts[8]) != 8) {
 								
                             unset($session[8]);
                             
-                            $response = "CON EARS\nEnter a valid start date of isolation. DDMMYYYY eg  01122020";
+                            $response = $this->sessionClosingTag . "Enter a valid start date of isolation. DDMMYYYY eg  01122020";
                             
                         } else {
 
+                            $session['isolation_start_date'] = Carbon::createFromFormat('dmY', $parts[8])->format('Y-m-d');
+
                             try {
+
+                                if(Carbon::parse($session['isolation_start_date'])->gt(Carbon::now()->format('Y-m-d') ) ) {
+
+                                    unset($session[8]);
+        
+                                    $response = $this->sessionClosingTag . "Future dates are invalid";
+        
+                                } else if(Carbon::parse($session['isolation_start_date'])->lt(Carbon::parse($session['date_of_contact']))) {
+
+                                    unset($session[8]);
+        
+                                    $response = $this->sessionClosingTag . "Isolation start date should be greater than the date you were exposed";
+
+                                } else {
     
                                 $session['isolation_start_date'] = Carbon::createFromFormat('dmY', $parts[8])->format('Y-m-d');
     
                                 $this->setSession($session);
 
-                                $response = $this->sessionOpeningTag . "Were you wearing Personal Protective Equipment(PPE)\n1 Yes\n2 No";    
+                                $response = $this->sessionOpeningTag . "Were you wearing Personal Protective Equipment(PPE)\n1 Yes\n2 No";   
+                                
+                                }
     
                             } catch (Exception $exception) {
     
@@ -434,7 +450,9 @@ class C4cJitengeUssdController extends Controller
         $session['management'] = 'N/A';
         $session['place_of_diagnosis'] = 'N/A';
 
-        $responseExp = $this->client->request('POST', 'http://c4c_api.mhealthkenya.org/api/exposures/covid/new/ussd', [
+        dd($session);
+
+        $responseExp = $this->client->request('POST', 'http://c4c_api.localhost/api/exposures/covid/new/ussd', [
             'json' => $session,
             'headers' => ['Authorization' => 'Bearer ' . $session['token'],
                           'Accept' => 'application/json',
